@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Study Tracker Pro</title>
+    
+    <!-- PWA / Home Screen Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" href="https://i.pinimg.com/1200x/ed/bb/bf/edbbbff2ad71f7cf479522c89d858215.jpg">
+
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --primary: #24b1ed;
+            --success: #22c55e;
+            --text: #1e293b;
+            --accent: #7c3aed;
+            --gold: #f59e0b;
+            --danger: #ef4444;
+        }
+        body, html {
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            font-family: -apple-system, system-ui, sans-serif;
+            background: var(--bg); color: var(--text);
+            overflow: hidden;
+        }
+        .viewport {
+            display: flex; width: 200vw; height: 100vh;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .page { width: 100vw; height: 100vh; padding: 20px; box-sizing: border-box; overflow-y: auto; padding-bottom: 150px; }
+        .show-weekly { transform: translateX(-100vw); }
+
+        /* Navigation */
+        .nav-toggle {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            display: flex; background: #e2e8f0; padding: 4px; border-radius: 50px; z-index: 100; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+        }
+        .nav-toggle button {
+            border: none; padding: 12px 24px; border-radius: 50px; cursor: pointer;
+            font-weight: 600; font-size: 0.9rem; background: transparent; color: #64748b;
+        }
+        .nav-toggle button.active { background: white; color: var(--primary); }
+
+        /* Toast Celebration */
+        #toast {
+            position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%);
+            background: #1e293b; color: white; padding: 15px 25px; border-radius: 50px;
+            font-weight: 700; font-size: 0.9rem; z-index: 90;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            transition: bottom 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex; align-items: center; gap: 10px; min-width: 260px; justify-content: center;
+            border: 2px solid var(--gold);
+        }
+        #toast.show { bottom: 90px; }
+
+        /* UI Cards */
+        .card {
+            background: white; border-radius: 24px; padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-top: 20px;
+        }
+        .session-row {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #f1f5f9; padding: 15px; border-radius: 18px; margin-bottom: 12px;
+        }
+        .btn {
+            background: var(--primary); color: white; border: none;
+            width: 44px; height: 44px; border-radius: 12px; font-size: 1.5rem; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .count { font-size: 1.8rem; font-weight: 800; min-width: 40px; text-align: center; }
+        
+        .daily-total-box {
+            margin-top: 20px; padding: 25px; border-radius: 20px;
+            background: linear-gradient(135deg, #4669e5, #7c3aed); color: white; text-align: center;
+            transition: all 0.5s ease;
+        }
+        .goal-reached {
+            background: linear-gradient(135deg, #f59e0b, #ef4444) !important;
+            box-shadow: 0 10px 20px rgba(245, 158, 11, 0.3);
+        }
+        .daily-total-box h3 { margin: 0; font-size: 0.8rem; opacity: 0.8; text-transform: uppercase; letter-spacing: 1px; }
+        .daily-total-box .hrs { font-size: 2.5rem; font-weight: 900; }
+
+        /* History Styling */
+        .log-item {
+            background: white; border-radius: 15px; margin-bottom: 10px;
+            border: 1px solid #e2e8f0; overflow: hidden;
+        }
+        .log-header { padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .history-breakdown { background: #f8fafc; display: none; padding: 10px; border-top: 1px solid #e2e8f0; }
+
+        /* Reset Button Styling */
+        .btn-reset {
+            margin-top: 40px; background: transparent; color: #94a3b8; border: 1px solid #e2e8f0;
+            padding: 12px; border-radius: 12px; width: 100%; cursor: pointer; font-size: 0.85rem;
+            transition: all 0.3s ease;
+        }
+        .btn-reset:active { background: var(--danger); color: white; border-color: var(--danger); }
+    </style>
+</head>
+<body>
+
+    <div id="toast">🚀 Great work, pushing limits!</div>
+
+    <div class="nav-toggle">
+        <button id="btn-daily" class="active" onclick="swipe(0)">Today</button>
+        <button id="btn-weekly" onclick="swipe(1)">History</button>
+    </div> 
+
+    <div class="viewport" id="viewport">
+        <!-- PAGE 1: DAILY -->
+        <div class="page">
+            <div class="card" style="text-align: center; margin-bottom: 10px; background: none; box-shadow: none;">
+                <div style="color: var(--accent); font-weight: 800; font-size: 1.1rem; margin-bottom: 5px;">
+                    🎯 <span id="month-name">Month</span>: <span id="goal-count">0 / 0</span>
+                </div>
+                <div style="color: #64748b; font-weight: 700; font-size: 0.9rem;">
+                    ⚡ Daily Goal: <span id="daily-progress">0 / 3</span> hrs
+                </div>
+            </div>
+
+            <div class="card">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <span id="display-date" style="font-weight: 800; color: #64748b; text-transform: uppercase; font-size: 0.85rem;"></span>
+                </div>
+
+                <div class="session-row">
+                    <span><strong>0.5 HR</strong> Session</span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <button class="btn" onclick="updateDaily('half', -1)">-</button>
+                        <span class="count" id="count-half">0</span>
+                        <button class="btn" onclick="updateDaily('half', 1)">+</button>
+                    </div>
+                </div>
+
+                <div class="session-row">
+                    <span><strong>1.0 HR</strong> Session</span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <button class="btn" onclick="updateDaily('full', -1)">-</button>
+                        <span class="count" id="count-full">0</span>
+                        <button class="btn" onclick="updateDaily('full', 1)">+</button>
+                    </div>
+                </div>
+
+                <div id="status-card" class="daily-total-box">
+                    <h3 id="status-title">Today's Progress</h3>
+                    <div class="hrs"><span id="daily-total">0.0</span> <small style="font-size: 1.2rem;">hrs</small></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE 2: HISTORY -->
+        <div class="page">
+            <div class="card">
+                <h2 style="margin:0 0 5px 0">Weekly Summary</h2>
+                <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 20px;">Cycle starts every Saturday</p>
+                
+                <div class="daily-total-box" style="background: #1e293b; margin: 0 0 20px 0;">
+                    <h3>Current Week Total</h3>
+                    <div class="hrs" style="font-size: 2rem;"><span id="week-running-total">0.0</span> <small>hrs</small></div>
+                </div>
+
+                <h3 style="font-size: 0.9rem; color: #64748b; text-transform: uppercase;">Past Weeks</h3>
+                <div id="weekly-list"></div>
+
+                <button class="btn-reset" onclick="resetAllData()">⚠️ Clear All Data</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const DAILY_TARGET = 3.0;
+    const QUOTES = ["Pushing limits! 🚀", "Overdrive: ON! ⚡", "Unstoppable! 🔥", "Elite work! 🏆", "Level up! 💪"];
+
+    let state = JSON.parse(localStorage.getItem('studyAppDataV2')) || getDefaultState();
+
+    function getDefaultState() {
+        return {
+            dayHalf: 0, dayFull: 0,
+            lastDate: new Date().toDateString(),
+            weekStartDate: "",
+            currentWeekData: {}, history: [] 
+        };
+    }
+
+    function showToast(msg) {
+        const toast = document.getElementById('toast');
+        toast.innerText = msg;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    function resetAllData() {
+        const confirm1 = confirm("Are you sure you want to delete everything? Your history cannot be recovered.");
+        if (confirm1) {
+            const confirm2 = confirm("LAST CHANCE: Wipe all data?");
+            if (confirm2) {
+                state = getDefaultState();
+                save();
+                showToast("Data Wiped Clean 🗑️");
+            }
+        }
+    }
+
+    function updateDaily(type, change) {
+        const key = type === 'half' ? 'dayHalf' : 'dayFull';
+        if (state[key] + change < 0) return;
+        state[key] += change;
+        
+        const newTotal = (state.dayHalf * 0.5) + (state.dayFull * 1.0);
+        state.currentWeekData[state.lastDate] = newTotal;
+
+        if (newTotal > DAILY_TARGET && change > 0) {
+            showToast(QUOTES[Math.floor(Math.random() * QUOTES.length)]);
+        } else if (newTotal === DAILY_TARGET && change > 0) {
+            showToast("Target Achieved! 🎯");
+        }
+        save();
+    }
+
+    function checkResets() {
+        const now = new Date();
+        const todayStr = now.toDateString();
+        const currentWeekStart = getStartOfWeek(now);
+
+        if (state.lastDate !== todayStr) {
+            state.dayHalf = 0; state.dayFull = 0;
+            state.lastDate = todayStr;
+        }
+
+        if (state.weekStartDate === "") {
+            state.weekStartDate = currentWeekStart;
+        } else if (state.weekStartDate !== currentWeekStart) {
+            const total = Object.values(state.currentWeekData).reduce((a, b) => a + b, 0);
+            if (total > 0) {
+                state.history.unshift({
+                    range: "Week starting " + state.weekStartDate,
+                    score: total.toFixed(1),
+                    details: {...state.currentWeekData}
+                });
+            }
+            state.currentWeekData = {};
+            state.weekStartDate = currentWeekStart;
+        }
+        save();
+    }
+
+    function getStartOfWeek(date) {
+        let d = new Date(date);
+        let diff = (d.getDay() + 1) % 7; 
+        d.setDate(d.getDate() - diff);
+        return d.toDateString();
+    }
+
+    function save() {
+        localStorage.setItem('studyAppDataV2', JSON.stringify(state));
+        render();
+    }
+
+    function render() {
+        const dayTotal = (state.dayHalf * 0.5) + (state.dayFull * 1.0);
+        document.getElementById('count-half').innerText = state.dayHalf;
+        document.getElementById('count-full').innerText = state.dayFull;
+        document.getElementById('daily-total').innerText = dayTotal.toFixed(1);
+        document.getElementById('display-date').innerText = state.lastDate;
+        document.getElementById('daily-progress').innerText = `${dayTotal.toFixed(1)} / ${DAILY_TARGET}`;
+        
+        const statusCard = document.getElementById('status-card');
+        const statusTitle = document.getElementById('status-title');
+        if (dayTotal >= DAILY_TARGET) {
+            statusCard.classList.add('goal-reached');
+            statusTitle.innerText = "Target Achieved! 🏆";
+        } else {
+            statusCard.classList.remove('goal-reached');
+            statusTitle.innerText = "Today's Progress";
+        }
+
+        const stats = getMonthlyStats(new Date());
+        document.getElementById('month-name').innerText = stats.name;
+        document.getElementById('goal-count').innerHTML = `${stats.met} / ${stats.passed} <small style="color:#94a3b8; font-size:0.75rem;">(of ${stats.total})</small>`;
+        
+        const weekTotal = Object.values(state.currentWeekData).reduce((a, b) => a + b, 0);
+        document.getElementById('week-running-total').innerText = weekTotal.toFixed(1);
+
+        document.getElementById('weekly-list').innerHTML = state.history.map((item, index) => `
+            <div class="log-item">
+                <div class="log-header" onclick="toggleBreakdown('hist-${index}')">
+                    <span style="font-weight:600; font-size:0.9rem;">${item.range}</span>
+                    <span style="color:var(--success); font-weight:800;">${item.score} hrs</span>
+                </div>
+                <div id="hist-${index}" class="history-breakdown">${Object.entries(item.details).map(([d, h]) => `
+                    <div style="display:flex; justify-content:space-between; font-size:0.8rem; padding:4px 0;">
+                        <span style="${h >= DAILY_TARGET ? 'color:var(--success); font-weight:bold;' : ''}">${d}</span>
+                        <span>${h} hrs</span>
+                    </div>
+                `).join('')}</div>
+            </div>
+        `).join('') || '<p style="text-align:center; padding:20px; color:#94a3b8;">No history yet.</p>';
+    }
+
+    function getMonthlyStats(now) {
+        const m = now.getMonth(), y = now.getFullYear();
+        const total = new Date(y, m + 1, 0).getDate(), passed = now.getDate();
+        let met = 0;
+        const isM = (d) => { const dt = new Date(d); return dt.getMonth() === m && dt.getFullYear() === y; };
+        Object.entries(state.currentWeekData).forEach(([d, h]) => { if (isM(d) && h >= DAILY_TARGET) met++; });
+        state.history.forEach(w => Object.entries(w.details).forEach(([d, h]) => { if (!state.currentWeekData[d] && isM(d) && h >= DAILY_TARGET) met++; }));
+        return { met, passed, total, name: now.toLocaleString('default', { month: 'long' }) };
+    }
+
+    function swipe(i) {
+        document.getElementById('viewport').classList.toggle('show-weekly', i === 1);
+        document.getElementById('btn-daily').classList.toggle('active', i === 0);
+        document.getElementById('btn-weekly').classList.toggle('active', i === 1);
+    }
+
+    function toggleBreakdown(id) {
+        const el = document.getElementById(id);
+        el.style.display = el.style.display === 'block' ? 'none' : 'block';
+    }
+
+    checkResets();
+    render();
+</script>
+</body>
+</html>
